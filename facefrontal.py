@@ -23,6 +23,15 @@ import time
 from scipy import ndimage
 import copy 
 
+def plot3d(p3ds):
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(p3ds[:,0],p3ds[:,1], p3ds[:,2])
+    plt.show()
+
+
 class frontalizer():
     def __init__(self,refname):
         # initialise the model with the 3d reference face 
@@ -64,7 +73,11 @@ class frontalizer():
         p2d[:,1] = (p2d_[:,1] - fb_[0][1])  * float(HT) / float(img.shape[0])
         img = cv2.resize(img, (WD,HT)) 
         #finished rescaling
+       
         tem3d = np.reshape(self.refU,(-1,3),order='F')
+        bgids = tem3d[:,1] < 0# excluding background 3d points 
+        # plot3d(tem3d)
+        # print tem3d.shape 
         ref3dface = np.insert(tem3d, 3, np.ones(len(tem3d)),axis=1).T
         ProjM = self.get_headpose(p2d)[2]
         proj3d = ProjM.dot(ref3dface)
@@ -75,6 +88,7 @@ class frontalizer():
         #The check the projection lies in the image or not 
         vlids = np.logical_and(np.logical_and(proj2dtmp[0] > 0, proj2dtmp[1] > 0), 
                                np.logical_and(proj2dtmp[0] < img.shape[1] - 1,  proj2dtmp[1] < img.shape[0] - 1))
+        vlids = np.logical_and(vlids, bgids)
         proj2d_valid = proj2dtmp[:,vlids]
 
         sp_  = self.refU.shape[0:2]
@@ -107,7 +121,7 @@ class frontalizer():
                 weights[:,0:mline] = 1.
             weights = cv2.GaussianBlur(weights, (33,33), 60.5).astype(np.float)
             synth_front /= np.max(synth_front) 
-            weight_take_from_org = 1 / np.exp(0.5 + synth_front)
+            weight_take_from_org = 1 / np.exp(1 + synth_front)
             weight_take_from_sym = 1 - weight_take_from_org
             weight_take_from_org = weight_take_from_org * np.fliplr(weights)
             weight_take_from_sym = weight_take_from_sym * np.fliplr(weights) 
@@ -123,7 +137,7 @@ class frontalizer():
 
 if __name__ == "__main__":
     ##to make sure you have dlib 
-    PATH_face_model = 'shape_predictor_68_face_landmarks.dat'
+    PATH_face_model = 'face_shape.dat'
     md_face = dlib.shape_predictor(PATH_face_model)
     face_det = dlib.get_frontal_face_detector()
     fronter = frontalizer('ref3d.pkl')
@@ -131,7 +145,7 @@ if __name__ == "__main__":
     #
 
     # test your image 
-    img_name = 'test.jpg'#names[k]
+    img_name = '/home/hy306/Desktop/7.JPG'#names[k]
     img = plt.imread(img_name)
     facedets = face_det(img,1)
     for det in facedets:
